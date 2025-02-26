@@ -1,0 +1,63 @@
+services:
+  catalog:
+    image: projectnessie/nessie
+    container_name: catalog
+    networks:
+      iceberg-net:
+    ports:
+      - 19120:19120
+
+  trino:
+    image: trinodb/trino
+    container_name: trino
+    networks:
+      iceberg-net:
+    ports:
+      - 8080:8080
+    volumes:
+      - "./trino/cat.properties:/etc/trino/catalog/cat.properties"
+
+  storage:
+    image: minio/minio:latest
+    container_name: storage
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password
+      - MINIO_REGION=us-east-1
+    volumes:
+      - data:/data
+    networks:
+      iceberg-net:
+    ports:
+      - 9000:9000
+      - 9001:9001
+    command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+
+  mc:
+    depends_on:
+      - storage
+    image: minio/mc:latest
+    container_name: mc
+    restart: no
+    networks:
+      iceberg-net:
+        aliases:
+          - minio.storage
+    environment:
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=password
+      - AWS_REGION=us-east-1
+    entrypoint: >
+      /bin/sh -c "
+        until (/usr/bin/mc config host add minio http://storage:9000 admin password) do echo '...waiting...' && sleep 1; done;
+        /usr/bin/mc mb minio/warehouse;
+        /usr/bin/mc mb minio/iceberg;
+        /usr/bin/mc policy set public minio/warehouse;
+        /usr/bin/mc policy set public minio/iceberg;
+      " 
+
+networks:
+  iceberg-net: 
+
+volumes:
+  data:
