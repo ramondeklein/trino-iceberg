@@ -35,7 +35,7 @@ CREATE TABLE cat.test.app_logging
   message     VARCHAR(1000)
 )
 WITH (
-  format = 'AVRO',
+  format = 'PARQUET',
   partitioning = ARRAY['application','machine','hour(timestamp)'],
   sorted_by = ARRAY['timestamp']
 );
